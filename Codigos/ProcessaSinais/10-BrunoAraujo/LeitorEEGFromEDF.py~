@@ -1,0 +1,127 @@
+#coding: utf- 8
+import csv
+import numpy as np
+import pdb
+
+
+import mne
+from mne.datasets import sample
+
+
+nomeDoEDF = raw_input('Digite o nome do arquivo edf que deseja avaliar: ')
+parteDaAnalise = int(input('Digite a parte que deseja analisar(1,2,3): '))
+outputPath = raw_input('Digite o nome da pasta de destino dos arquivos: ')
+
+# Metodo para leitura de arquivos .csv
+def readCSV(filename):
+    my_data = np.genfromtxt(filename, delimiter=',')
+    return my_data
+
+# Metodo para leitura de arquivos .csv
+# retorna matriz 22 X 200*n_segundos
+def readEDF(filename):   
+	raw = mne.io.read_raw_edf(filename, preload=True,verbose=True)
+	return raw._data.transpose()
+
+if __name__ == "__main__":
+
+	
+	while True:
+		if parteDaAnalise == 1:
+			RegistroDeVideos = 'PrimeiraParte.csv'
+			break;	
+		elif parteDaAnalise == 2:
+			RegistroDeVideos = 'SegundaParte.csv'
+			break;	
+		elif parteDaAnalise == 3:
+			RegistroDeVideos = 'TerceiraParte.csv'
+			break;	
+		else:
+			print('A parte informada é inválida.')
+
+	
+	# Leitura do tempo dos videos da primeira parte
+	videos = open(RegistroDeVideos,'r')
+	tempoDosVideos = np.genfromtxt(videos.readlines())
+	tempoDeEspera = 510
+	videos.close()
+
+	#Leitura dos sinais EEG
+	EEG = open(nomeDoEDF , 'r')
+	sinais = readEDF(EEG) #readCSV(EEG)
+	pdb.set_trace()
+
+	'''
+	Contador - Controla a quantidade de videos a ser analisada
+	primeiroPulso - Instante em que foi detectado o primeiro pulso
+	tempoDeReproducaoTotal - Define um valor aproximado do termino da parte analisada(desde o primeiro pulso , contando com a duração total dos videos, tempo de resposta ao questionario e cruz de 	fixaçao)
+	indexVideo - Índice do video que esta sendo gravado indicando o tempo dele na lista tempoDosVideos
+	segundo - quanto cada segundo equivale em colunas
+	apontador - indica o indice da lista de sinais a ser copiado e define o limite inferior de cada video(inicio)
+	'''
+	contador = 0
+	classificador = raw_input('O vídeo está inteiro(s/n)? ')
+	if classificador == 's':
+
+		primeiroPulso = float(input('Digite o instante do primeiro pulso: '))
+		tempoDeReproducaoTotal = primeiroPulso + tempoDosVideos.cumsum()[19] + tempoDeEspera
+		indexVideo = 0
+		segundo = 200
+		apontador =  primeiroPulso * 200
+		while contador < 20:
+			video = []	# Lista com os dados de cada video (sempre que o loop reinicia ela volta a ser vazia para o proximo video)
+			limiteInferior = apontador # Define o novo limite inferior como o apontador(que foi limite superior do passado + 25 * 200(tempo de espera do questionario e video de fixação))
+			print("Limite inferior: %.2f || Limite Superior: %.1f || Tamanho do Video em colunas : %.1f"  % (apontador / 200 ,(limiteInferior + (tempoDosVideos[indexVideo] * 200)) / 200,(limiteInferior+(tempoDosVideos[indexVideo]*200))-apontador))
+			while apontador < (limiteInferior + (tempoDosVideos[indexVideo] * 200)): #Limites superior e inferior que determinam o tamanho em segundos do video em colunas	
+				video.append(sinais[apontador])
+				apontador += 1
+			f = open(outputPath+'/Video' + str(indexVideo + 1) + '.csv', "wb")	
+			f.write('Time,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21\n') # Primeira coluna indicando a informação de cada linha	
+			c = csv.writer(f)
+			c.writerows(video)
+			f.close()
+			apontador = apontador + (26.7 * 200)	# Novo limite superior(apontador após os segundos do video 	registrado + 25 segundos do tempo de resposta ao questionario + cruz de fixaçao)
+			indexVideo += 1 # Indice de tempo do proximo video
+			contador += 1 # Proximo video do loop
+		print("Essa parte acaba aproximadamente em : %.1f Segundos" % tempoDeReproducaoTotal)	
+
+
+	else:
+		segundo = 200	
+		tipoDeCorte = raw_input('Deseja recuperar a parte anterior ou posterior? ')
+		indexVideo = int(input('Digite a posicao do vídeo: ')) -1	
+		pulsoVisivel = float(input('Digite o instante do pulso visível: '))
+		apontador = pulsoVisivel * 200
+		if tipoDeCorte == 'posterior':
+			while indexVideo <= 19:
+				video = []
+				limiteInferior = apontador
+				print("Limite inferior: %.2f || Limite Superior: %.1f || Tamanho do Video em colunas : %.1f"  % (apontador / 200 ,(limiteInferior + (tempoDosVideos[indexVideo] * 200)) / 200, (limiteInferior+(tempoDosVideos[indexVideo]*200))-apontador))
+
+				while apontador < (limiteInferior + (tempoDosVideos[indexVideo] * 200)):
+					video.append(sinais[apontador])
+					apontador += 1
+				f = open(outputPath+'/Video' + str(indexVideo + 1) + '.csv', "wb")	
+				f.write('Time,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21\n') # Primeira coluna indicando a informação de cada linha	
+				c = csv.writer(f)
+				c.writerows(video)
+				f.close()
+				apontador = apontador + (26.7 * 200)
+				indexVideo += 1
+				contador += 1
+		else:		
+			while indexVideo >= 0:
+				video = []
+				limiteSuperior = apontador  + (tempoDosVideos[indexVideo] * 200)
+				print("Limite inferior: %.2f || Limite Superior: %.1f || Tamanho do Video em colunas : %.1f"  % (apontador / 200 ,limiteSuperior / 200,limiteSuperior - apontador))
+				while limiteSuperior > apontador:
+					video.append(sinais[limiteSuperior])
+					limiteSuperior -= 1
+					f = open(outputPath+'/Video' + str(indexVideo + 1) + '.csv', "wb")	
+				f.write('Time,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21\n') # Primeira coluna indicando a informação de cada linha	
+				c = csv.writer(f)
+				c.writerows(video)
+				f.close()
+				apontador = (apontador - 26.7 * 200) - (tempoDosVideos[indexVideo - 1] * 200)
+				indexVideo -= 1
+								

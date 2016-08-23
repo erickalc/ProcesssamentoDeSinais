@@ -1,0 +1,89 @@
+#coding: utf- 8
+import csv
+import numpy as np
+import sys
+import pdb
+import scipy as sp
+import mne
+from scipy import signal
+
+#metodo para carregar arquivo edf
+#retorna uma matriz numpy. Nas linhas são os canais, nas colunas são os dados
+def readEDF(fileName):
+	raw = mne.io.read_raw_edf(fileName, preload=True,verbose=True)
+	return raw._data
+
+#http://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.signal.welch.html
+def computePSD(mChosenChns):
+	f1, psd1 = signal.welch(mChosenChns[0,:],fs=200)
+	f2, psd2 = signal.welch(mChosenChns[1,:],fs=200)
+	f3, psd3 = signal.welch(mChosenChns[2,:],fs=200)
+	f4, psd4 = signal.welch(mChosenChns[3,:],fs=200)
+	myArray = np.concatenate((psd1, psd2, psd3, psd4))
+	#return psd1, psd2, psd3, psd4
+	return myArray
+	
+def getChosenChannels(edfFileName):
+	mEDF = readEDF(edfFileName)
+	
+	#vamos utilizar dados de apenas 4 canais:
+	#fp1 : canal na linha 0
+	#fp2 : canal na linha 1
+	#f3 : canal na linha 2
+	#f4 : canal na linha 3
+	
+	mChosenChns = np.zeros((4, len(mEDF[0])))
+	
+	mChosenChns[0,:] = mEDF[0,:]
+	mChosenChns[1,:] = mEDF[1,:]
+	mChosenChns[2,:] = mEDF[2,:]
+	mChosenChns[3,:] = mEDF[3,:]
+	
+	return mChosenChns
+	
+	
+# Metodo para leitura de arquivos .csv
+def readCSV(filename):
+	#pula linha de cabeçalho
+	my_data = np.genfromtxt(filename, delimiter=',',skip_header=1)
+	return my_data
+
+def thresholdValenceValues(csvFile):
+	thresholdLabels = []
+	my_data = readCSV(csvFile)
+	for i in range(len(my_data)):
+		if my_data[i][0] > 5:
+			thresholdLabels.append(1)
+		else:
+			thresholdLabels.append(0)
+	return thresholdLabels
+
+		
+
+if __name__ == "__main__" :
+	#print 'Hello!'
+
+	labels1FileName = sys.argv[1]
+	edfFileName = sys.argv[2]
+
+	#labels1 = readCSV(labels1FileName)
+	
+	thresholds = thresholdValenceValues(labels1FileName)
+	print thresholds	
+	print len(thresholds)
+	
+	mChosenChns = getChosenChannels(edfFileName)
+	
+	#psd1, psd2, psd3, psd4 = computePSD(mChosenChns)
+	psd = computePSD(mChosenChns)
+	
+	print len(mChosenChns[0])
+	
+	
+	print psd.shape
+	#print psd2.shape
+	#print psd3.shape
+	#print psd4.shape
+	
+	#pdb.set_trace()
+	# próximo passo: realizar o treinamento do classificador SVM: http://scikit-learn.org/stable/modules/svm.html
