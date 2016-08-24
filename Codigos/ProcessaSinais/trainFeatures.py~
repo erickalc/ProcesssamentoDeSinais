@@ -48,6 +48,7 @@ def readCSV(filename):
 	my_data = np.genfromtxt(filename, delimiter=',',skip_header=1)
 	return my_data
 
+# Retorna um array com os limiares para cada arquivo CSV passado como parâmetro
 def thresholdValenceValues(csvFile):
 	thresholdLabels = []
 	my_data = readCSV(csvFile)
